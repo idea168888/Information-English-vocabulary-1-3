@@ -11,7 +11,7 @@ from gtts import gTTS
 
 root = pathlib.Path(__file__).resolve().parents[1]
 html = (root / "index.html").read_text()
-items = re.findall(r'word: "([^"]+)"[\\s\\S]*?exampleEn: "([^"]+)"', html)
+items = re.findall(r'word: "([^"]+)"[\s\S]*?exampleEn: "([^"]+)"', html)
 assert len(items) == 52, f"Unexpected vocabulary count: {len(items)}"
 jobs = [(word, kind, text) for word, sentence in items
         for kind, text in (("word", word), ("sentence", sentence))]
