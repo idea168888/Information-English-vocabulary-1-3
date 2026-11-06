@@ -834,7 +834,7 @@
       const request = ++playbackRequest;
       pronunciationAudio.pause();
       pronunciationAudio.hidden = true;
-      pronunciationAudio.src = new URL('audio/' + item.word + '-' + kind + '.mp3', document.baseURI).href;
+      pronunciationAudio.src = new URL('audio/' + item.word + '-' + kind + '.mp3?v=natural-us-1', document.baseURI).href;
       audioStatus.textContent = '正在載入發音…';
       const playback = pronunciationAudio.play();
       if (playback) playback.catch(() => {
