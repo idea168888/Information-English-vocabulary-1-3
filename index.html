@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI資訊單字卡</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+    body {
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+      background: radial-gradient(circle at top left, #1e1b4b, #0f172a 60%, #020617);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* 3D 翻轉卡片核心樣式 */
+    .perspective-1000 {
+      perspective: 1200px;
+    }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
+      transform-style: preserve-3d;
+    }
+
+    .card-inner.is-flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      border-radius: 1.75rem;
+    }
+
+    .card-back {
+      transform: rotateY(180deg);
+    }
+
+    /* 玻璃擬態與光暈效果 */
+    .glass-front {
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.92));
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+    }
+
+    .glass-back {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(148, 163, 184, 0.2) inset;
+    }
+
+    /* 自定義捲軸 */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="text-slate-100 flex flex-col items-center justify-between py-6 px-4 select-none">
+
+  <!-- 頂部標題與控制列 -->
+  <header class="w-full max-w-lg flex flex-col items-center text-center space-y-3 z-10">
+    <div class="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold tracking-wider uppercase">
+      <i class="fa-solid fa-microchip"></i>
+      <span>AI & Information Vocabulary</span>
+    </div>
+    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-100 to-indigo-300">
+      AI資訊單字卡
+    </h1>
+
+    <!-- 進度與快速篩選區 -->
+    <div class="w-full flex items-center justify-between pt-2 text-xs text-slate-400 px-1">
+      <div class="flex items-center space-x-2">
+        <span id="counter-badge" class="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-indigo-300 font-semibold">
+          1 / 45
+        </span>
+        <button id="shuffle-btn" onclick="toggleShuffle()" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition flex items-center space-x-1" title="隨機打亂順序">
+          <i class="fa-solid fa-shuffle"></i>
+          <span>隨機排序</span>
+        </button>
+      </div>
+
+      <button onclick="toggleListModal()" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition flex items-center space-x-1.5">
+        <i class="fa-solid fa-list-ul"></i>
+        <span>單字總覽 (第1~3課)</span>
+      </button>
+    </div>
+
+    <!-- 進度條 -->
+    <div class="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+      <div id="progress-bar" class="bg-gradient-to-r from-indigo-500 to-cyan-400 h-full transition-all duration-300" style="width: 2.22%"></div>
+    </div>
+  </header>
+
+  <!-- 中央 3D 翻轉單字卡 -->
+  <main class="w-full max-w-lg my-4 flex flex-col items-center justify-center flex-grow">
+    <div class="w-full h-[380px] sm:h-[410px] perspective-1000 cursor-pointer group" onclick="flipCard()">
+      <div id="card-inner" class="card-inner">
+
+        <!-- 卡片正面：英文單字與音標 -->
+        <div class="card-face glass-front text-slate-800 p-7 sm:p-9 flex flex-col justify-between">
+          <div class="flex justify-between items-center">
+            <span id="front-index" class="text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full bg-indigo-100 text-indigo-700">
+              WORD #01
+            </span>
+            <button onclick="speakWord(event)" class="w-11 h-11 rounded-full bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-600 flex items-center justify-center transition shadow-sm" title="點擊聽取英文發音">
+              <i class="fa-solid fa-volume-high text-lg"></i>
+            </button>
+          </div>
+
+          <div class="my-auto flex flex-col items-center text-center space-y-4">
+            <span id="front-pos" class="text-xs font-semibold px-3 py-0.5 rounded-md bg-slate-200/80 text-slate-600">
+              n.
+            </span>
+            <h2 id="front-word" class="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 break-all">
+              source
+            </h2>
+            <p id="front-phonetic" class="text-lg sm:text-xl font-mono text-indigo-600 font-medium">
+              /sɔːrs/
+            </p>
+          </div>
+
+          <div class="flex items-center justify-center space-x-2 text-xs text-slate-400 font-medium pt-2 border-t border-slate-200/70">
+            <i class="fa-solid fa-rotate text-indigo-400 group-hover:rotate-180 transition-transform duration-500"></i>
+            <span>點擊卡片翻至背面查看中文、諧音與例句</span>
+          </div>
+        </div>
+
+        <!-- 卡片背面：中文意思、諧音記憶、實用例句 -->
+        <div class="card-face card-back glass-back text-white p-6 sm:p-8 flex flex-col justify-between">
+          <!-- 頂部：單字小提示與發音 -->
+          <div class="flex justify-between items-center border-b border-slate-700/70 pb-3">
+            <div>
+              <div class="flex items-baseline space-x-2">
+                <h3 id="back-word" class="text-xl font-bold text-indigo-300">source</h3>
+                <span id="back-phonetic" class="text-xs font-mono text-slate-400">/sɔːrs/</span>
+              </div>
+            </div>
+            <button onclick="speakWord(event)" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-indigo-400 flex items-center justify-center transition" title="點擊發音">
+              <i class="fa-solid fa-volume-high text-sm"></i>
+            </button>
+          </div>
+
+          <!-- 中間內容區 -->
+          <div class="my-auto space-y-4 overflow-y-auto pr-1 py-2">
+            <!-- 中文解釋 -->
+            <div>
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-cyan-400 block mb-1">
+                中文意思
+              </span>
+              <p id="back-meaning" class="text-2xl sm:text-3xl font-bold text-white leading-snug">
+                來源；源頭
+              </p>
+            </div>
+
+            <!-- 講義諧音/聯想記憶 -->
+            <div class="bg-amber-500/10 border border-amber-400/25 rounded-xl p-3">
+              <div class="flex items-center space-x-1.5 text-amber-300 text-xs font-bold mb-1">
+                <i class="fa-solid fa-lightbulb"></i>
+                <span>講義諧音 / 聯想記憶</span>
+              </div>
+              <p id="back-mnemonic" class="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
+                「搜死」(sou-si) → 搜死也要找出源頭
+              </p>
+            </div>
+
+            <!-- 實用例句 -->
+            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-3.5">
+              <div class="flex items-center justify-between text-indigo-300 text-xs font-bold mb-1.5">
+                <span class="flex items-center space-x-1.5">
+                  <i class="fa-solid fa-quote-left"></i>
+                  <span>課本與練習題原句</span>
+                </span>
+                <button onclick="speakSentence(event)" class="text-xs text-indigo-400 hover:text-indigo-200 flex items-center space-x-1 transition" title="朗讀例句">
+                  <i class="fa-solid fa-play text-[10px]"></i>
+                  <span>朗讀</span>
+                </button>
+              </div>
+              <p id="back-example-en" class="text-xs sm:text-sm text-slate-100 font-medium leading-relaxed">
+                A power source supplies electrical energy to a circuit.
+              </p>
+              <p id="back-example-zh" class="text-xs text-slate-400 mt-1">
+                電源供應電能給電路。
+              </p>
+            </div>
+          </div>
+
+          <!-- 底部提示 -->
+          <div class="text-center text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+            點擊卡片返回正面
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- 底部操作按鈕列 -->
+  <footer class="w-full max-w-lg flex flex-col items-center space-y-3 z-10">
+    <div class="w-full flex items-center gap-3">
+      <button onclick="prevCard()" class="px-4 py-3.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-300 font-semibold transition flex items-center justify-center shadow-lg" title="上一個單字 (方向鍵左)">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+
+      <button onclick="nextCard()" class="flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 active:scale-[0.99] text-white font-bold text-base sm:text-lg shadow-xl shadow-indigo-500/25 transition flex items-center justify-center space-x-2.5">
+        <span>下一個單字</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+
+    <p class="text-[11px] text-slate-500 text-center">
+      支援鍵盤快捷鍵：<span class="text-slate-400">空白鍵</span> 翻面 · <span class="text-slate-400">← / →</span> 切換單字 · <span class="text-slate-400">S</span> 發音
+    </p>
+  </footer>
+
+  <!-- 單字總覽彈出視窗 -->
+  <div id="list-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-2xl max-h-[82vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-white">第 1 + 2 + 3 課 單字總覽 (共 45 字)</h3>
+          <p class="text-xs text-slate-400">點擊任意單字可直接跳轉至該張單字卡</p>
+        </div>
+        <button onclick="toggleListModal()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="word-list-container" class="p-4 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <!-- 動態渲染單字列表 -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 完整內建上傳 PDF《英文單字學習表 (1+2+3課)》與課本圖片原句之 45 個單字資料
+    const vocabList = [
+      {
+        word: "source",
+        phonetic: "/sɔːrs/",
+        pos: "n. 名詞",
+        meaning: "來源；源頭",
+        mnemonic: "「搜死」(sou-si) → 搜死也要找出源頭",
+        exampleEn: "A power source, such as a generator or battery, provides electrical current to the circuit.",
+        exampleZh: "電源（例如發電機或電池）提供電流給電路。"
+      },
+      {
+        word: "conductor",
+        phonetic: "/kənˈdʌktər/",
+        pos: "n. 名詞",
+        meaning: "導體；傳導體",
+        mnemonic: "「肯搭客車」(ken-da-ke-che) → 肯搭客車的司機是個好導體",
+        exampleEn: "Copper is known for being a good conductor of electricity.",
+        exampleZh: "銅以作為良好的電流導體而聞名。"
+      },
+      {
+        word: "consist",
+        phonetic: "/kənˈsɪst/",
+        pos: "v. 動詞",
+        meaning: "組成；包含",
+        mnemonic: "「肯死守」(ken-si-shou) → 肯死守陣地才能組成堅強防線",
+        exampleEn: "The most basic form of an electrical circuit consists of three essential parts.",
+        exampleZh: "最基本形式的電路是由三個必要部分所組成。"
+      },
+      {
+        word: "component",
+        phonetic: "/kəmˈpoʊnənt/",
+        pos: "n. 名詞",
+        meaning: "組成部分；零件",
+        mnemonic: "「看破能」(kan-po-neng) → 看破能不能成為重要零件",
+        exampleEn: "Marcus thinks that exercise is a key component of a healthy lifestyle.",
+        exampleZh: "Marcus 認為運動是健康生活方式的一個重要組成要素。"
+      },
+      {
+        word: "essential",
+        phonetic: "/ɪˈsenʃəl/",
+        pos: "adj. 形容詞",
+        meaning: "必要的；不可或缺的",
+        mnemonic: "「醫生說」(yi-sheng-shuo) → 聽醫生說的話是必要的",
+        exampleEn: "You can't leave out the source of voltage, for it is one of the essential parts of the design.",
+        exampleZh: "你不能省略電壓源，因為它是設計中不可或缺的部分之一。"
+      },
+      {
+        word: "battery",
+        phonetic: "/ˈbætəri/",
+        pos: "n. 名詞",
+        meaning: "電池",
+        mnemonic: "「背特累」(bei-te-lei) → 背了一大堆沉重的電池特累",
+        exampleEn: "A small device that stores energy and powers a flashlight is a battery.",
+        exampleZh: "儲存能量並為手電筒供電的小型裝置是電池。"
+      },
+      {
+        word: "provide",
+        phonetic: "/prəˈvaɪd/",
+        pos: "v. 動詞",
+        meaning: "提供；供應",
+        mnemonic: "「婆買的」(po-mai-de) → 婆婆買的物資，提供給全家",
+        exampleEn: "Generators provide electricity for homes and businesses.",
+        exampleZh: "發電機為家庭與企業提供電力。"
+      },
+      {
+        word: "carry",
+        phonetic: "/ˈkæri/",
+        pos: "v. 動詞",
+        meaning: "傳送；輸送；搬運",
+        mnemonic: "「凱瑞」(kai-rui) → 找神隊友凱瑞幫忙搬運",
+        exampleEn: "I can't lift this heavy box, so could you carry it for me?",
+        exampleZh: "我搬不動這個重箱子，你可以幫我搬嗎？"
+      },
+      {
+        word: "resistance",
+        phonetic: "/rɪˈzɪstəns/",
+        pos: "n. 名詞",
+        meaning: "電阻；阻力",
+        mnemonic: "「惹事等死」(re-shi-deng-si) → 惹事等死會遇到強大阻力",
+        exampleEn: "This material offers high resistance to fire.",
+        exampleZh: "這種材料具有很高的耐火性（抵抗力）。"
+      },
+      {
+        word: "convert",
+        phonetic: "/kənˈvɜːrt/",
+        pos: "v. 動詞",
+        meaning: "轉換；轉變；改造",
+        mnemonic: "「肯換的」(ken-huan-de) → 只要肯換思考方式，就能順利轉換跑道",
+        exampleEn: "Solar panels can convert sunlight into electricity.",
+        exampleZh: "太陽能板可以將陽光轉換成電力。"
+      },
+      {
+        word: "form",
+        phonetic: "/fɔːrm/",
+        pos: "n. / v.",
+        meaning: "形式；形態",
+        mnemonic: "「縫」(feng) → 把布縫起來，形成一件衣服",
+        exampleEn: "Light is one form of energy; heat is another.",
+        exampleZh: "光是一種能量的形式；熱則是另一種。"
+      },
+      {
+        word: "include",
+        phonetic: "/ɪnˈkluːd/",
+        pos: "v. 動詞",
+        meaning: "包含；包括",
+        mnemonic: "「硬可入」(yin-ke-ru) → 硬是可入隊，也就是包含在內",
+        exampleEn: "Did you include Mary as one of the contributors to the project?",
+        exampleZh: "你有把 Mary 列入（包含在）這個專案的貢獻者之一嗎？"
+      },
+      {
+        word: "fundamental",
+        phonetic: "/ˌfʌndəˈmentəl/",
+        pos: "adj. / n.",
+        meaning: "基礎的；基本的；基本要素",
+        mnemonic: "「放得滿頭」(fang-de-man-tou) → 知識放得滿頭都是基礎",
+        exampleEn: "The fundamentals of a good education are critical thinking, curiosity, and lifelong learning.",
+        exampleZh: "良好教育的基本要素是批判性思考、好奇心和終身學習。"
+      },
+      {
+        word: "measure",
+        phonetic: "/ˈmeʒər/",
+        pos: "v. / n.",
+        meaning: "測量；衡量",
+        mnemonic: "「沒轍」(mei-zhe) → 太大了，測量到沒轍",
+        exampleEn: "You need to measure the ingredients carefully for this recipe.",
+        exampleZh: "做這道食譜時，你需要仔細測量食材的份量。"
+      },
+      {
+        word: "represent",
+        phonetic: "/ˌreprɪˈzent/",
+        pos: "v. 動詞",
+        meaning: "代表；表示；象徵",
+        mnemonic: "「瑞普認」(rui-pu-ren) → 瑞普認可的人，才能代表我們",
+        exampleEn: "The colors of this flag represent unity, strength, and dedication.",
+        exampleZh: "這面旗幟的顏色象徵團結、力量與奉獻。"
+      },
+      {
+        word: "quantify",
+        phonetic: "/ˈkwɑːntɪfaɪ/",
+        pos: "v. 動詞",
+        meaning: "量化；以數字表示",
+        mnemonic: "「狂踢飛」(kuang-ti-fei) → 數量多到把人狂踢飛來量化",
+        exampleEn: "The engineering department wants to buy better instruments to quantify the strength of materials.",
+        exampleZh: "工程部想購買更好的儀器來量化（測定）材料的強度。"
+      },
+      {
+        word: "ensure",
+        phonetic: "/ɪnˈʃʊr/",
+        pos: "v. 動詞",
+        meaning: "確保；保證",
+        mnemonic: "「硬求」(yin-qiu) → 向神明硬求一個保證",
+        exampleEn: "Janet double-checked all the wiring to ensure everything was working properly.",
+        exampleZh: "Janet 再次檢查所有配線，以確保一切運作正常。"
+      },
+      {
+        word: "current",
+        phonetic: "/ˈkɜːrənt/",
+        pos: "n. 名詞",
+        meaning: "電流",
+        mnemonic: "「卡人」(ka-ren) → 這股電流太強，不小心就會卡人",
+        exampleEn: "Electric current flows through a complete circuit.",
+        exampleZh: "電流會在完整的電路中流動。"
+      },
+      {
+        word: "positive",
+        phonetic: "/ˈpɑːzətɪv/",
+        pos: "adj. 形容詞",
+        meaning: "正極的；正的",
+        mnemonic: "「胖子挺」(pang-zi-ting) → 胖子挺起肚子，展現正面的態度",
+        exampleEn: "The side of a battery marked with a plus sign (+) is the positive side.",
+        exampleZh: "電池上標有加號（+）的那一端是正極。"
+      },
+      {
+        word: "negative",
+        phonetic: "/ˈneɡətɪv/",
+        pos: "adj. 形容詞",
+        meaning: "負面的；消極的；有害的",
+        mnemonic: "「那個踢我」(nei-ge-ti-wo) → 那個踢我的人，充滿了負面的情緒與惡意",
+        exampleEn: "Teamwork can be harmed by negative attitudes among the members.",
+        exampleZh: "團隊合作可能會因為成員之間的負面態度而受損。"
+      },
+      {
+        word: "impact",
+        phonetic: "/ˈɪmpækt/",
+        pos: "n. 名詞",
+        meaning: "衝擊；巨大影響；結果",
+        mnemonic: "「硬拍客」(ying-pai-ke) → 硬去拍打乘客會造成強烈衝擊與嚴重後果",
+        exampleEn: "Plastic waste has a harmful impact on our rivers and oceans.",
+        exampleZh: "塑膠廢棄物對我們的河川與海洋造成有害的衝擊。"
+      },
+      {
+        word: "generation",
+        phonetic: "/ˌdʒenəˈreɪʃən/",
+        pos: "n. 名詞",
+        meaning: "產生；製造；發電；世代",
+        mnemonic: "「責任惹神」(ze-ren-re-shen) → 製造發電污染是人類的責任，都惹怒神明了",
+        exampleEn: "The generation of power from fossil fuels creates a lot of pollution.",
+        exampleZh: "利用化石燃料發電會產生大量的污染。"
+      },
+      {
+        word: "contributor",
+        phonetic: "/kənˈtrɪbjətər/",
+        pos: "n. 名詞",
+        meaning: "貢獻者；促成因素；成因",
+        mnemonic: "「肯去背他」(ken-qu-bei-ta) → 肯主動背起隊友的人，是獲勝的重要貢獻者與促成因素",
+        exampleEn: "Scientists say that this pollution is a major contributor to the accelerating pace of climate change.",
+        exampleZh: "科學家表示，這種污染是氣候變遷步調加速的主要促成因素。"
+      },
+      {
+        word: "accelerate",
+        phonetic: "/ækˈseləreɪt/",
+        pos: "v. 動詞",
+        meaning: "加速；促進；提升",
+        mnemonic: "「愛客誰來得」(ai-ke-shei-lai-de) → 為了吸引熱愛的客人加速湧來，店家促銷全力衝刺",
+        exampleEn: "This pollution is a major contributor to the accelerating pace of climate change.",
+        exampleZh: "這種污染是促使氣候變遷步調不斷加速的主要成因。"
+      },
+      {
+        word: "pace",
+        phonetic: "/peɪs/",
+        pos: "n. 名詞",
+        meaning: "步調；速度；節奏",
+        mnemonic: "「配速」(pei-su) → 跑步時要好好搭配呼吸與腳步的節奏步調",
+        exampleEn: "The shift to renewable energy is paced by advances in clean technology.",
+        exampleZh: "轉向再生能源的步調是由潔淨科技的進步所帶動的。"
+      },
+      {
+        word: "harness",
+        phonetic: "/ˈhɑːrnɪs/",
+        pos: "v. 動詞",
+        meaning: "駕馭；利用；控制",
+        mnemonic: "「汗流浹背拉泥石」(han-ni-si) → 想要駕馭並利用自然力量，常讓人累得滿頭大汗",
+        exampleEn: "Steam turbines are used to harness wind energy in wind farms.",
+        exampleZh: "渦輪機被用來駕馭並利用自然資源以產生電力。"
+      },
+      {
+        word: "utilize",
+        phonetic: "/ˈjuːtəlaɪz/",
+        pos: "v. 動詞",
+        meaning: "利用；使用；應用",
+        mnemonic: "「油條賴著」(you-tiao-lai-zhe) → 充分利用每一根油條，不要賴在盤子裡浪費",
+        exampleEn: "Alice is going to utilize her free time to learn a new language.",
+        exampleZh: "Alice 打算利用她的空閒時間來學習一門新語言。"
+      },
+      {
+        word: "array",
+        phonetic: "/əˈreɪ/",
+        pos: "n. 名詞",
+        meaning: "陣列；排列；系列",
+        mnemonic: "「額外銳利」(e-rei) → 衛兵一整列整齊排列，手上的長矛顯得額外銳利",
+        exampleEn: "A large array of solar panels is arranged across this field.",
+        exampleZh: "一大片太陽能板陣列排列在這片田野上。"
+      },
+      {
+        word: "turbine",
+        phonetic: "/ˈtɜːrbaɪn/",
+        pos: "n. 名詞",
+        meaning: "渦輪機；渦輪發動機",
+        mnemonic: "「特別硬」(te-bin) → 渦輪機葉片材質特別硬，才能高速旋轉發電",
+        exampleEn: "Water flowing through the dam turns the turbine blades to produce energy.",
+        exampleZh: "流經水壩的水會轉動渦輪機葉片以產生能源。"
+      },
+      {
+        word: "blade",
+        phonetic: "/bleɪd/",
+        pos: "n. 名詞",
+        meaning: "葉片；刀刃；槳葉",
+        mnemonic: "「不累得」(bu-lei-de) → 風車的大葉片轉了一整天，好像都不會累似的",
+        exampleEn: "Turbine blades are pushed by the wind to generate electricity.",
+        exampleZh: "渦輪機葉片受風推動以產生電力。"
+      },
+      {
+        word: "spin",
+        phonetic: "/spɪn/",
+        pos: "v. 動詞",
+        meaning: "旋轉；自轉；轉動",
+        mnemonic: "「死拚」(si-pin) → 陀螺在地上死拚命地旋轉不停",
+        exampleEn: "Steam is used to spin the turbines in this power plant.",
+        exampleZh: "這座發電廠使用蒸汽來推動渦輪機旋轉。"
+      },
+      {
+        word: "artificial",
+        phonetic: "/ˌɑːrtɪˈfɪʃəl/",
+        pos: "adj. 形容詞",
+        meaning: "人工的；人造的；合成的",
+        mnemonic: "「阿提非笑」(a-ti-fei-xiao) → 人工智慧機器人露出不是真笑的人造笑容",
+        exampleEn: "Beautiful artificial flowers were arranged in the lobby of the old hotel.",
+        exampleZh: "這間老飯店的大廳裡擺設了美麗的人造花。"
+      },
+      {
+        word: "digester",
+        phonetic: "/daɪˈdʒestər/",
+        pos: "n. 名詞",
+        meaning: "沼氣池；消化槽；分解器",
+        mnemonic: "「大姐食客」(da-jie-si-te) → 廚餘沼氣消化槽就像大姐請客後的廚餘收集分解器",
+        exampleEn: "Organic waste was decomposed in the digester to produce biogas.",
+        exampleZh: "有機廢棄物在沼氣消化槽中被分解以產生生物氣體（沼氣）。"
+      },
+      {
+        word: "decompose",
+        phonetic: "/ˌdiːkəmˈpoʊz/",
+        pos: "v. 動詞",
+        meaning: "分解；腐爛；衰變",
+        mnemonic: "「地看破死」(di-kan-po-si) → 落在地上的枯葉看破生死，自然腐爛分解融入土壤",
+        exampleEn: "Organic waste was decomposed in the digester to produce biogas.",
+        exampleZh: "有機廢棄物在消化槽中分解，以產生沼氣。"
+      },
+      {
+        word: "resilient",
+        phonetic: "/rɪˈzɪliənt/",
+        pos: "adj. 形容詞",
+        meaning: "有彈性的；堅韌的；適應力強的",
+        mnemonic: "「熱力日韌」(re-zi-li-en-te) → 經過日曬熱力的考驗，材料依然堅韌且富有彈性",
+        exampleEn: "A resilient power grid combines renewable sources like wind and solar with traditional fossil fuels.",
+        exampleZh: "具韌性的電網將風能、太陽能等再生能源與傳統化石燃料結合在一起。"
+      },
+      {
+        word: "reliable",
+        phonetic: "/rɪˈlaɪəbəl/",
+        pos: "adj. 形容詞",
+        meaning: "可靠的；可信賴的",
+        mnemonic: "「瑞賴伯」(rui-lai-bo) → 瑞賴伯伯做事負責，是個可靠的人",
+        exampleEn: "The software update improved my phone's battery life and made it more reliable.",
+        exampleZh: "工程師持續改良電子元件，使其更加強大且可靠。"
+      },
+      {
+        word: "basic",
+        phonetic: "/ˈbeɪsɪk/",
+        pos: "adj. 形容詞",
+        meaning: "基礎的；基本的",
+        mnemonic: "「背死客」(bei-si-ke) → 基本功沒練好，不好的體驗會背死一堆客人",
+        exampleEn: "Ginny's comments were tailored to a basic audience.",
+        exampleZh: "Ginny 的評論是針對基礎聽眾所量身打造的。"
+      },
+      {
+        word: "vital",
+        phonetic: "/ˈvaɪtəl/",
+        pos: "adj. 形容詞",
+        meaning: "極其重要的；致命的",
+        mnemonic: "「歪頭」(wai-tou) → 歪頭閃過致命一擊，保住極其重要的性命",
+        exampleEn: "It's now beyond doubt that clean energy is vital for a sustainable future.",
+        exampleZh: "毫無疑問地，潔淨能源對於永續的未來是極其重要的。"
+      },
+      {
+        word: "category",
+        phonetic: "/ˈkætəɡɔːri/",
+        pos: "n. 名詞",
+        meaning: "種類；類別",
+        mnemonic: "「卡特哥理」(ka-te-ge-li) → 幫卡特哥理清帳目，分門別類排好",
+        exampleEn: "Is it true that this electronic component falls into the passive category?",
+        exampleZh: "這個電子元件真的屬於被動元件這個類別嗎？"
+      },
+      {
+        word: "operate",
+        phonetic: "/ˈɑːpəreɪt/",
+        pos: "v. 動詞",
+        meaning: "運轉；操作",
+        mnemonic: "「阿婆累得」(a-po-lei-de) → 阿婆累得滿頭汗，因為一直操作機器",
+        exampleEn: "Did you know that we can use solar power to operate these active components?",
+        exampleZh: "你知道我們可以使用太陽能來讓這些主動元件運轉嗎？"
+      },
+      {
+        word: "amplify",
+        phonetic: "/ˈæmplɪfaɪ/",
+        pos: "v. 動詞",
+        meaning: "放大；增強",
+        mnemonic: "「俺怕理髮」(an-pa-li-fa) → 俺怕理髮師不小心，把缺點放大增強了",
+        exampleEn: "Our engineers can use transistors to amplify weak electrical signals.",
+        exampleZh: "我們的工程師可以使用電晶體來放大微弱的電訊號。"
+      },
+      {
+        word: "complex",
+        phonetic: "/kəmˈpleks/",
+        pos: "adj. 形容詞",
+        meaning: "複雜的；綜合大樓",
+        mnemonic: "「康普勒斯」(kang-pu-lei-si) → 這座綜合大樓的設計太複雜了",
+        exampleEn: "The teacher's instructions were too complex for me to follow.",
+        exampleZh: "老師的指示太過複雜，讓我無法跟上。"
+      },
+      {
+        word: "flow",
+        phonetic: "/floʊ/",
+        pos: "v. / n.",
+        meaning: "流動；水流",
+        mnemonic: "「浮流」(fu-liu) → 樹葉浮在水面上，順著水流流動",
+        exampleEn: "Today, Lucy learned in class that resistors regulate the flow of electric current.",
+        exampleZh: "今天 Lucy 在課堂上學到，電阻器可以用來調節電流的流動。"
+      },
+      {
+        word: "protect",
+        phonetic: "/prəˈtekt/",
+        pos: "v. 動詞",
+        meaning: "保護；防護",
+        mnemonic: "「破鐵殼」(po-tie-ke) → 就算只有破鐵殼，也能保護我們不受傷",
+        exampleEn: "The software update protects my phone's battery life.",
+        exampleZh: "這項軟體更新保護了我手機的電池壽命。"
+      },
+      {
+        word: "external",
+        phonetic: "/ɪkˈstɜːrnəl/",
+        pos: "adj. 形容詞",
+        meaning: "外部的；外面的",
+        mnemonic: "「一顆石頭弄」(yi-ke-shi-tou-nong) → 從外部丟一顆石頭，弄破了窗戶",
+        exampleEn: "Not having enough storage in his computer, Jason added a cheap external hard drive to increase storage.",
+        exampleZh: "由於電腦儲存空間不足，Jason 加裝了一個便宜的外接硬碟來增加容量。"
+      },
+      {
+        word: "filter",
+        phonetic: "/ˈfɪltər/",
+        pos: "n. / v.",
+        meaning: "過濾器；濾波器；篩選",
+        mnemonic: "「飛了特」(fei-le-te) → 灰塵飛了特別多，需要過濾器來篩選空氣",
+        exampleEn: "You can use capacitors as filters to remove unwanted signals in a circuit.",
+        exampleZh: "你可以使用電容器作為濾波器，以濾除電路中不需要的訊號。"
+      },
+      {
+        word: "boost",
+        phonetic: "/buːst/",
+        pos: "v. 動詞",
+        meaning: "促進；增加；提升",
+        mnemonic: "「不思退」(bu-si-tui) → 戰場上勇往直前不思退，才能提升士氣",
+        exampleEn: "They have boosted the performance of electronic devices and reduced their size.",
+        exampleZh: "它們提升了電子設備的效能並縮小了它們的體積。"
+      },
+      {
+        word: "detect",
+        phonetic: "/dɪˈtekt/",
+        pos: "v. 動詞",
+        meaning: "探測；檢測；發現",
+        mnemonic: "「低頭看」(di-tou-kan) → 低頭看地面，探測有沒有掉落物",
+        exampleEn: "Sensors detect changes in the environment, such as temperature or light, and turn them into electrical signals.",
+        exampleZh: "感測器探測環境中的變化（例如溫度或光線），並將其轉換為電訊號。"
+      },
+      {
+        word: "link",
+        phonetic: "/lɪŋk/",
+        pos: "v. / n.",
+        meaning: "連結；聯繫",
+        mnemonic: "「零客」(ling-ke) → 商店一整天零客人，沒辦法跟顧客產生連結",
+        exampleEn: "These connectors link the different parts of this circuit together.",
+        exampleZh: "這些連接器將這個電路的不同部分連結在一起。"
+      },
+      {
+        word: "specific",
+        phonetic: "/spəˈsɪfɪk/",
+        pos: "adj. 形容詞",
+        meaning: "特定的；明確的",
+        mnemonic: "「死背細節」(si-bei-xi-jie) → 必須死背明確特定的細節才能過關",
+        exampleEn: "Each part plays a specific role, and together, they help create useful and innovative devices.",
+        exampleZh: "每個零件都扮演著特定的角色，它們共同協助創造出實用且創新的裝置。"
+      },
+      {
+        word: "innovative",
+        phonetic: "/ˈɪnəveɪtɪv/",
+        pos: "adj. 形容詞",
+        meaning: "創新的；革新的",
+        mnemonic: "「因挪威體」(yin-nuo-wei-ti) → 因為挪威體制的影響，產生了創新的想法",
+        exampleEn: "The company's engineers have developed a pretty innovative way to store solar energy.",
+        exampleZh: "該公司的工程師已經開發出一種相當創新的太陽能儲存方式。"
+      },
+      {
+        word: "evolve",
+        phonetic: "/ɪˈvɑːlv/",
+        pos: "v. 動詞",
+        meaning: "進化；發展",
+        mnemonic: "「一娃舞」(yi-wa-wu) → 這一個娃娃跳舞的動作，逐漸進化得很流暢",
+        exampleEn: "Electronic devices have evolved with new technologies.",
+        exampleZh: "電子設備隨著新技術的發展而不斷進化。"
+      }
+    ];
+
+    let currentIndex = 0;
+    let isFlipped = false;
+    let isShuffled = false;
+    let displayOrder = vocabList.map((_, idx) => idx);
+
+    const cardInner = document.getElementById('card-inner');
+    const counterBadge = document.getElementById('counter-badge');
+    const progressBar = document.getElementById('progress-bar');
+    const frontIndex = document.getElementById('front-index');
+    const frontPos = document.getElementById('front-pos');
+    const frontWord = document.getElementById('front-word');
+    const frontPhonetic = document.getElementById('front-phonetic');
+
+    const backWord = document.getElementById('back-word');
+    const backPhonetic = document.getElementById('back-phonetic');
+    const backMeaning = document.getElementById('back-meaning');
+    const backMnemonic = document.getElementById('back-mnemonic');
+    const backExampleEn = document.getElementById('back-example-en');
+    const backExampleZh = document.getElementById('back-example-zh');
+
+    function renderCard() {
+      const realIndex = displayOrder[currentIndex];
+      const item = vocabList[realIndex];
+      const total = vocabList.length;
+
+      counterBadge.textContent = `${currentIndex + 1} / ${total}`;
+      progressBar.style.width = `${((currentIndex + 1) / total) * 100}%`;
+
+      frontIndex.textContent = `WORD #${String(realIndex + 1).padStart(2, '0')}`;
+      frontPos.textContent = item.pos;
+      frontWord.textContent = item.word;
+      frontPhonetic.textContent = item.phonetic;
+
+      backWord.textContent = item.word;
+      backPhonetic.textContent = item.phonetic;
+      backMeaning.textContent = item.meaning;
+      backMnemonic.textContent = item.mnemonic;
+      backExampleEn.textContent = item.exampleEn;
+      backExampleZh.textContent = item.exampleZh;
+    }
+
+    function flipCard() {
+      isFlipped = !isFlipped;
+      cardInner.classList.toggle('is-flipped', isFlipped);
+    }
+
+    function nextCard() {
+      if (isFlipped) {
+        isFlipped = false;
+        cardInner.classList.remove('is-flipped');
+        setTimeout(() => {
+          currentIndex = (currentIndex + 1) % vocabList.length;
+          renderCard();
+        }, 220);
+      } else {
+        currentIndex = (currentIndex + 1) % vocabList.length;
+        renderCard();
+      }
+    }
+
+    function prevCard() {
+      if (isFlipped) {
+        isFlipped = false;
+        cardInner.classList.remove('is-flipped');
+        setTimeout(() => {
+          currentIndex = (currentIndex - 1 + vocabList.length) % vocabList.length;
+          renderCard();
+        }, 220);
+      } else {
+        currentIndex = (currentIndex - 1 + vocabList.length) % vocabList.length;
+        renderCard();
+      }
+    }
+
+    function toggleShuffle() {
+      isShuffled = !isShuffled;
+      const btn = document.getElementById('shuffle-btn');
+      if (isShuffled) {
+        for (let i = displayOrder.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [displayOrder[i], displayOrder[j]] = [displayOrder[j], displayOrder[i]];
+        }
+        btn.classList.add('bg-indigo-600/40', 'border-indigo-400', 'text-white');
+      } else {
+        displayOrder = vocabList.map((_, idx) => idx);
+        btn.classList.remove('bg-indigo-600/40', 'border-indigo-400', 'text-white');
+      }
+      currentIndex = 0;
+      isFlipped = false;
+      cardInner.classList.remove('is-flipped');
+      renderCard();
+    }
+
+    function speakText(text, rate = 0.92) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = rate;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function speakWord(event) {
+      event.stopPropagation();
+      const item = vocabList[displayOrder[currentIndex]];
+      speakText(item.word, 0.88);
+    }
+
+    function speakSentence(event) {
+      event.stopPropagation();
+      const item = vocabList[displayOrder[currentIndex]];
+      speakText(item.exampleEn, 0.95);
+    }
+
+    function toggleListModal() {
+      const modal = document.getElementById('list-modal');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden')) {
+        populateWordList();
+      }
+    }
+
+    function populateWordList() {
+      const container = document.getElementById('word-list-container');
+      container.innerHTML = '';
+      vocabList.forEach((item, idx) => {
+        const isCurrent = displayOrder[currentIndex] === idx;
+        const div = document.createElement('div');
+        div.className = `p-3 rounded-xl border cursor-pointer transition flex items-center justify-between ${
+          isCurrent
+            ? 'bg-indigo-600/25 border-indigo-400 text-white'
+            : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/70 text-slate-200'
+        }`;
+        div.onclick = () => {
+          const targetPos = displayOrder.indexOf(idx);
+          currentIndex = targetPos !== -1 ? targetPos : 0;
+          isFlipped = false;
+          cardInner.classList.remove('is-flipped');
+          renderCard();
+          toggleListModal();
+        };
+        div.innerHTML = `
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-mono text-indigo-400">#${String(idx + 1).padStart(2, '0')}</span>
+              <span class="font-bold">${item.word}</span>
+              <span class="text-xs text-slate-400 font-mono">${item.phonetic}</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-0.5">${item.meaning}</p>
+          </div>
+          <i class="fa-solid fa-chevron-right text-xs text-slate-500"></i>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // 鍵盤快捷鍵支援
+    document.addEventListener('keydown', (e) => {
+      const modalOpen = !document.getElementById('list-modal').classList.contains('hidden');
+      if (modalOpen) {
+        if (e.key === 'Escape') toggleListModal();
+        return;
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        flipCard();
+      } else if (e.code === 'ArrowRight') {
+        nextCard();
+      } else if (e.code === 'ArrowLeft') {
+        prevCard();
+      } else if (e.key.toLowerCase() === 's') {
+        const item = vocabList[displayOrder[currentIndex]];
+        speakText(item.word, 0.88);
+      }
+    });
+
+    // 初始化第一張卡片
+    renderCard();
+  </script>
+</body>
+</html>
